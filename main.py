@@ -1,153 +1,101 @@
-from flask import Flask
-from threading import Thread
 import os
 import requests
-
+from flask import Flask
 from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
-TOKEN = "8793772063:AAGXXP3sQ9oaFZXTTEjzpTrnwFZm8aeOnpw"
-
+# ================= CONFIG =================
+TOKEN = os.getenv("8793772063:AAHYAvsoh1gfUttx7fKDGh7VQm1WvX8OLYM")
 app = Flask(__name__)
 
+# ================= FLASK =================
 @app.route("/")
 def home():
-    return "Universal Crypto + Forex + Gold Bot Running 🚀"
+    return "🤖 ICT + SMC Trading Bot Live"
 
-def run_web():
-    port = int(os.environ.get("PORT", 10000))
-    app.run(host="0.0.0.0", port=port)
+# ================= MARKET DATA (simple mock logic) =================
+def get_market_data():
+    # इथे तू API (Binance/Forex) connect करू शकतोस पुढे
+    return {
+        "price": 43250,
+        "high": 44000,
+        "low": 42000,
+        "trend": "BULLISH"
+    }
 
-# ---------------- ASSETS ----------------
-CRYPTO_PAIRS = [
-    "BTCUSDT", "ETHUSDT", "SOLUSDT", "XRPUSDT", "ADAUSDT", "DOGEUSDT"
-]
+# ================= ICT + SMC LOGIC =================
+def ict_smc_signal():
+    data = get_market_data()
 
-FOREX_PAIRS = [
-    "EURUSD", "GBPUSD", "USDJPY", "AUDUSD", "USDCHF"
-]
+    range_size = data["high"] - data["low"]
+    current = data["price"]
 
-# 🟡 GOLD (XAUUSD)
-GOLD_PAIRS = [
-    "XAUUSD"
-]
+    # Liquidity zones (simple ICT idea)
+    upper_liquidity = data["high"]
+    lower_liquidity = data["low"]
 
-# ---------------- PRICE ----------------
-def get_price(symbol):
-    try:
-        if symbol.endswith("USDT"):
-            url = f"https://api.binance.com/api/v3/ticker/price?symbol={symbol}"
-            return float(requests.get(url).json()["price"])
-
-        elif symbol == "XAUUSD":
-            # Gold free API (demo source)
-            url = "https://api.metals.live/v1/spot/gold"
-            data = requests.get(url).json()
-            return float(data[0]["price"])
-
-        else:
-            url = f"https://api.twelvedata.com/price?symbol={symbol}&apikey=demo"
-            return float(requests.get(url).json()["price"])
-    except:
-        return 0
-
-# ---------------- RSI ----------------
-def get_rsi(symbol):
-    try:
-        if symbol.endswith("USDT"):
-            url = f"https://api.binance.com/api/v3/klines?symbol={symbol}&interval=5m&limit=100"
-            data = requests.get(url).json()
-            closes = [float(c[4]) for c in data]
-        else:
-            return 50
-
-        gains, losses = [], []
-
-        for i in range(1, len(closes)):
-            diff = closes[i] - closes[i - 1]
-            gains.append(max(diff, 0))
-            losses.append(abs(min(diff, 0)))
-
-        avg_gain = sum(gains[-14:]) / 14
-        avg_loss = sum(losses[-14:]) / 14 or 1
-
-        rs = avg_gain / avg_loss
-        return 100 - (100 / (1 + rs))
-    except:
-        return 50
-
-# ---------------- SIGNAL ----------------
-def analyze(symbol):
-    price = get_price(symbol)
-    rsi = get_rsi(symbol)
-
-    if rsi <= 30:
-        signal = "🟢 STRONG BUY"
-        score = 90
-    elif rsi <= 45:
-        signal = "BUY"
-        score = 70
-    elif rsi <= 55:
-        signal = "NEUTRAL"
-        score = 50
-    elif rsi <= 70:
-        signal = "SELL"
-        score = 70
+    # Smart structure logic
+    if current > (data["low"] + range_size * 0.65):
+        signal = "🔥 STRONG BUY"
+        confidence = 80
+    elif current < (data["low"] + range_size * 0.35):
+        signal = "🔻 STRONG SELL"
+        confidence = 78
     else:
-        signal = "🔴 STRONG SELL"
-        score = 90
+        signal = "⚖️ WAIT / NEUTRAL"
+        confidence = 50
 
-    return price, rsi, signal, score
+    return {
+        "pair": "BTC/USDT",
+        "timeframes": ["3m", "5m", "15m", "1h"],
+        "trend": data["trend"],
+        "signal": signal,
+        "confidence": f"{confidence}%",
+        "liquidity_high": upper_liquidity,
+        "liquidity_low": lower_liquidity
+    }
 
-# ---------------- TOP TRADES ----------------
-def get_top_trades():
-    results = []
-
-    all_pairs = CRYPTO_PAIRS + FOREX_PAIRS + GOLD_PAIRS
-
-    for sym in all_pairs:
-        price, rsi, signal, score = analyze(sym)
-        results.append((sym, price, rsi, signal, score))
-
-    results.sort(key=lambda x: x[4], reverse=True)
-
-    return results[:4]
-
-# ---------------- TELEGRAM ----------------
+# ================= TELEGRAM COMMANDS =================
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text("🤖 Universal Crypto + Forex + Gold Bot Active!")
+    await update.message.reply_text(
+        "🤖 ICT + SMC Bot Active!\n\nUse:\n/signal - Get Market Analysis"
+    )
 
 async def signal(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    top = get_top_trades()
+    s = ict_smc_signal()
 
-    msg = "🔥 TOP 4 TRADING SETUPS (CRYPTO + FOREX + GOLD)\n\n"
+    msg = f"""
+📊 ICT + SMC ANALYSIS
 
-    for sym, price, rsi, sig, score in top:
-        msg += f"""
-📊 {sym}
-💰 Price: {price}
-📈 RSI: {round(rsi,2)}
-⚡ Signal: {sig}
-💯 Strength: {score}%
+💱 Pair: {s['pair']}
+📈 Trend: {s['trend']}
 
--------------------
+⏱ Timeframes:
+{', '.join(s['timeframes'])}
+
+🔥 Signal: {s['signal']}
+📊 Confidence: {s['confidence']}
+
+💧 Liquidity High: {s['liquidity_high']}
+💧 Liquidity Low: {s['liquidity_low']}
 """
-
-    msg += "\n⚠️ Risk Management Important"
 
     await update.message.reply_text(msg)
 
-# ---------------- MAIN ----------------
+# ================= MAIN =================
 def main():
-    bot = Application.builder().token(TOKEN).build()
+    telegram_app = Application.builder().token(TOKEN).build()
 
-    bot.add_handler(CommandHandler("start", start))
-    bot.add_handler(CommandHandler("signal", signal))
+    telegram_app.add_handler(CommandHandler("start", start))
+    telegram_app.add_handler(CommandHandler("signal", signal))
 
-    print("Bot Started...")
+    print("🤖 ICT SMC Bot Running...")
 
-    Thread(target=run_web).start()
-    bot.run_polling()
+    telegram_app.run_polling()
 
+# ================= RUN =================
 if __name__ == "__main__":
+    from threading import Thread
+    Thread(target=lambda: app.run(host="0.0.0.0", port=10000)).start()
+
     main()
