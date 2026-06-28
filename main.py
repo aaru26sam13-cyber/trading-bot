@@ -6,7 +6,7 @@ from telegram import Update
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 # तुझा Telegram Bot Token इथे टाक
-TOKEN = "8793772063:AAGGPCah10LLEK3AXkcrXKmWM4xKkbamHTE"
+TOKEN = "8793772063:AAGXXP3sQ9oaFZXTTEjzpTrnwFZm8aeOnpw"
 
 # Flask App
 web = Flask(__name__)
